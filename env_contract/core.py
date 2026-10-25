@@ -78,10 +78,17 @@ def parse_document(text: str) -> Document:
             invalid.append(line_number)
             continue
         entries.setdefault(match[1], []).append(Occurrence(line_number, empty))
-    return Document({key: tuple(items) for key, items in sorted(entries.items())}, tuple(invalid))
+    if invalid:
+        # After a malformed quote, later assignment-like text may actually be
+        # part of a secret value. Do not expose uncertain tokens as key names.
+        return Document(invalid_lines=tuple(invalid))
+    return Document({key: tuple(items) for key, items in sorted(entries.items())})
 
 
 def compare_documents(actual: Document, example: Document) -> Comparison:
+    if actual.invalid_lines or example.invalid_lines:
+        return Comparison([], [], [], {'actual': {}, 'example': {}},
+                          {'actual': list(actual.invalid_lines), 'example': list(example.invalid_lines)})
     actual_keys, expected_keys = set(actual.entries), set(example.entries)
     return Comparison(
         missing=sorted(expected_keys - actual_keys),

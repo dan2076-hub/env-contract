@@ -118,3 +118,12 @@ class CliTests(unittest.TestCase):
                     self.assertEqual(main(['actual.env']), 0)
             finally:
                 os.chdir(previous)
+
+    def test_malformed_multiline_secret_does_not_leak_as_a_key(self):
+        secret = 'SYNTHETIC_MULTILINE_SECRET'
+        actual = 'API_KEY="first line\n' + secret + '=tail\n'
+        for options in [(), ('--json',)]:
+            with self.subTest(options=options):
+                result = self.run_cli(actual, 'API_KEY=\n', *options)
+                self.assertEqual(result.returncode, 2)
+                self.assertNotIn(secret, result.stdout + result.stderr)

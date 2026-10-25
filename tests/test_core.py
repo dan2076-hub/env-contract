@@ -87,3 +87,11 @@ class SyntaxTests(unittest.TestCase):
         secret = 'SYNTHETIC_MALFORMED_SECRET'
         document = parse_document('KEY="' + secret)
         self.assertNotIn(secret, repr(document))
+
+    def test_unclosed_multiline_value_cannot_become_a_reported_key(self):
+        secret = 'SYNTHETIC_MULTILINE_SECRET'
+        document = parse_document('KEY="first line\n' + secret + '=tail\n')
+        self.assertNotIn(secret, repr(document))
+        result = compare_documents(document, parse_document('KEY=\n'))
+        self.assertNotIn(secret, repr(result))
+        self.assertEqual(result.exit_code(), 2)

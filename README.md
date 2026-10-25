@@ -55,7 +55,7 @@ env-contract .env --example .env.example --strict --json
 | `1` | Missing/empty expected keys, duplicates, or strict unexpected keys |
 | `2` | Invalid arguments, unreadable files, invalid UTF-8 or malformed assignments |
 
-Syntax and file errors take precedence over validation failures. File errors contain only a role (`actual`/`example`) and a safe kind (`unreadable`/`invalid_encoding`). When a document is incomplete, differences are provisional and `ok` is false. Names and lists are sorted; line numbers start at 1. JSON schema version is 1.
+Syntax and file errors take precedence over validation failures. File errors contain only a role (`actual`/`example`) and a safe kind (`unreadable`/`invalid_encoding`). If either file has invalid syntax, key metadata from the malformed file is discarded and all key comparisons are suppressed: assignment-like text after an unclosed quote may be secret content. Only invalid line numbers are reported. After I/O failures, any displayed differences are provisional and `ok` is false. Names and lists are sorted; line numbers start at 1. JSON schema version is 1.
 
 This checks key contracts; it does not validate URLs or types, find leaked credentials, generate files, or offer autofixes. Configuration is read into process memory for parsing, but values are not retained in result objects or printed.
 
