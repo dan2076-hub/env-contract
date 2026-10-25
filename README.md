@@ -4,12 +4,23 @@ Catch missing environment keys before running an application, without displaying
 
 Requires Python 3.11 or newer. No runtime dependencies.
 
+[Русский](README.ru.md)
+
 ```sh
 python -m env_contract examples/sample.env --example examples/sample.env.example
 # Contract OK
 ```
 
 Install from a checkout with `python -m pip install .`, then use `env-contract` with the same arguments.
+
+To get the source:
+
+```sh
+git clone https://github.com/dan2076-hub/env-contract.git
+cd env-contract
+python -m pip install .
+env-contract examples/sample.env --example examples/sample.env.example --json
+```
 
 The actual file is required; the example defaults to `.env.example`. Missing or empty expected keys fail the check. Additional keys are warnings. Duplicate keys in either file fail, with all occurrence line numbers.
 
@@ -26,12 +37,35 @@ Variables, shell expressions and escape sequences are never evaluated or expande
 
 Output contains key names and line numbers, never values. The tool does not modify inputs or access the network.
 
-Exit codes: `0` accepted, `1` contract failed, `2` file or syntax error.
+## Automation and exit codes
+
+```sh
+env-contract .env --example .env.example --strict --json
+```
+
+`--strict` makes unexpected keys failures. `--json` emits a single JSON object, including handled file, decoding and syntax errors. Invalid CLI arguments use argparse diagnostics on stderr.
+
+```json
+{"schema_version": 1, "missing": ["API_KEY"], "empty": [], "unexpected": [], "duplicates": {"actual": {}, "example": {}}, "invalid_lines": {"actual": [], "example": []}, "errors": [], "ok": false}
+```
+
+| Exit | Meaning |
+| --- | --- |
+| `0` | Contract accepted; unexpected keys may be warnings |
+| `1` | Missing/empty expected keys, duplicates, or strict unexpected keys |
+| `2` | Invalid arguments, unreadable files, invalid UTF-8 or malformed assignments |
+
+Syntax and file errors take precedence over validation failures. File errors contain only a role (`actual`/`example`) and a safe kind (`unreadable`/`invalid_encoding`). When a document is incomplete, differences are provisional and `ok` is false. Names and lists are sorted; line numbers start at 1. JSON schema version is 1.
+
+This checks key contracts; it does not validate URLs or types, find leaked credentials, generate files, or offer autofixes. Configuration is read into process memory for parsing, but values are not retained in result objects or printed.
 
 ## Development
 
 ```sh
 python -m unittest discover -s tests -v
+python -m pip wheel --no-deps . --wheel-dir dist
 ```
+
+GitHub Actions runs the suite and installed CLI on Windows/Linux with Python 3.11 and 3.13. Tests include synthetic secret sentinels, quoting, BOM/CRLF and JSON failure reports.
 
 MIT licensed; see [LICENSE](LICENSE).

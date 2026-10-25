@@ -26,12 +26,20 @@ class Comparison:
     invalid_lines: dict[str, list[int]]
     errors: list[dict[str, str]] = field(default_factory=list)
 
-    def exit_code(self) -> int:
+    def exit_code(self, strict: bool = False) -> int:
         if self.errors or any(self.invalid_lines.values()):
             return 2
-        if self.missing or self.empty or any(self.duplicates.values()):
+        if self.missing or self.empty or any(self.duplicates.values()) or (strict and self.unexpected):
             return 1
         return 0
+
+    def to_dict(self, strict: bool = False) -> dict:
+        return {
+            'schema_version': 1, 'missing': self.missing, 'empty': self.empty,
+            'unexpected': self.unexpected, 'duplicates': self.duplicates,
+            'invalid_lines': self.invalid_lines, 'errors': self.errors,
+            'ok': self.exit_code(strict) == 0,
+        }
 
 
 def value_is_empty(raw: str) -> bool | None:
