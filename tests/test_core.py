@@ -33,3 +33,57 @@ class ContractTests(unittest.TestCase):
         document = parse_document('VALID=demo\nNOT AN ASSIGNMENT\n')
         self.assertEqual(document.invalid_lines, (2,))
         self.assertEqual(compare_documents(document, parse_document('')).exit_code(), 2)
+
+
+class SyntaxTests(unittest.TestCase):
+    def test_value_syntax_and_emptiness(self):
+        cases = [
+            ('KEY=', True, True), ('KEY=   ', True, True),
+            ('KEY="   "', True, True), ("KEY='\t '", True, True),
+            ('export KEY=demo', True, False), ("KEY='demo # value'", True, False),
+            ('KEY=demo # comment', True, False), ('KEY= # comment', True, True),
+            ('KEY=#literal', True, False), ('KEY=demo#literal', True, False),
+            ('KEY="demo" # comment', True, False), ('KEY="demo" garbage', False, None),
+            ('KEY="unclosed', False, None), ("KEY='unclosed", False, None),
+            ('KEY="escaped\\\"quote"', True, False),
+            ('KEY="escaped\\\"', False, None),
+            ("KEY='backslash\\' trailing", False, None),
+            ('KEY="${NOT_EXPANDED}"', True, False),
+            ('KEY=$(not-executed)', True, False),
+            ('BAD-KEY=demo', False, None), ('9KEY=demo', False, None),
+        ]
+        for line, valid, empty in cases:
+            with self.subTest(line=line):
+                document = parse_document(line)
+                self.assertEqual(not document.invalid_lines, valid)
+                if valid:
+                    self.assertEqual(document.entries['KEY'][0].empty, empty)
+
+    def test_bom_and_crlf(self):
+        document = parse_document('\ufeffKEY=demo\r\nPORT=8000\r\n')
+        self.assertEqual(document.invalid_lines, ())
+        self.assertEqual(sorted(document.entries), ['KEY', 'PORT'])
+
+    def test_expected_empty_values_are_still_required(self):
+        result = compare_documents(parse_document(''), parse_document('KEY=\n'))
+        self.assertEqual(result.missing, ['KEY'])
+
+    def test_empty_expected_keys_fail_but_empty_extras_only_warn(self):
+        result = compare_documents(parse_document('KEY=\nEXTRA=\n'), parse_document('KEY=\n'))
+        self.assertEqual(result.empty, ['KEY'])
+        self.assertEqual(result.unexpected, ['EXTRA'])
+        self.assertEqual(result.exit_code(), 1)
+
+    def test_duplicate_roles_and_all_line_numbers(self):
+        result = compare_documents(parse_document('KEY=a\n\nKEY=b\n'), parse_document('KEY=\nKEY=\n'))
+        self.assertEqual(result.duplicates, {'actual': {'KEY': [1, 3]}, 'example': {'KEY': [1, 2]}})
+        self.assertEqual(result.exit_code(), 1)
+
+    def test_multiline_quoted_values_are_invalid(self):
+        document = parse_document('KEY="first\nsecond"\n')
+        self.assertEqual(document.invalid_lines, (1, 2))
+
+    def test_invalid_values_are_absent_from_representations(self):
+        secret = 'SYNTHETIC_MALFORMED_SECRET'
+        document = parse_document('KEY="' + secret)
+        self.assertNotIn(secret, repr(document))

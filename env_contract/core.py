@@ -34,25 +34,52 @@ class Comparison:
         return 0
 
 
+def value_is_empty(raw: str) -> bool | None:
+    """Return emptiness, or None for invalid syntax, without retaining a value."""
+    stripped = raw.lstrip()
+    if not stripped or stripped[0] not in {'"', "'"}:
+        return not re.sub(r'\s+#.*$', '', raw).strip()
+    quote = stripped[0]
+    index = 1
+    while index < len(stripped):
+        character = stripped[index]
+        if quote == '"' and character == '\\':
+            index += 2
+            continue
+        if character == quote:
+            tail = stripped[index + 1:].strip()
+            if tail and not tail.startswith('#'):
+                return None
+            return not stripped[1:index].strip()
+        index += 1
+    return None
+
+
 def parse_document(text: str) -> Document:
     entries: dict[str, list[Occurrence]] = {}
     invalid = []
-    for line_number, line in enumerate(text.splitlines(), 1):
+    for line_number, line in enumerate(text.removeprefix('\ufeff').splitlines(), 1):
         if not line.strip() or line.lstrip().startswith('#'):
             continue
         match = ASSIGNMENT.fullmatch(line)
         if not match:
             invalid.append(line_number)
             continue
-        entries.setdefault(match[1], []).append(Occurrence(line_number))
+        empty = value_is_empty(match[2])
+        if empty is None:
+            invalid.append(line_number)
+            continue
+        entries.setdefault(match[1], []).append(Occurrence(line_number, empty))
     return Document({key: tuple(items) for key, items in sorted(entries.items())}, tuple(invalid))
 
 
 def compare_documents(actual: Document, example: Document) -> Comparison:
     actual_keys, expected_keys = set(actual.entries), set(example.entries)
     return Comparison(
-        missing=sorted(expected_keys - actual_keys), empty=[],
+        missing=sorted(expected_keys - actual_keys),
+        empty=sorted(key for key in actual_keys & expected_keys if any(item.empty for item in actual.entries[key])),
         unexpected=sorted(actual_keys - expected_keys),
-        duplicates={'actual': {}, 'example': {}},
+        duplicates={role: {key: [item.line for item in items] for key, items in document.entries.items() if len(items) > 1}
+                    for role, document in [('actual', actual), ('example', example)]},
         invalid_lines={'actual': list(actual.invalid_lines), 'example': list(example.invalid_lines)},
     )

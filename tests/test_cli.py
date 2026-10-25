@@ -39,3 +39,21 @@ class CliTests(unittest.TestCase):
                                 capture_output=True, text=True, encoding='utf-8', check=False)
         self.assertEqual(result.returncode, 0)
         self.assertIn('--example', result.stdout)
+
+    def test_secret_not_printed_on_invalid_quote(self):
+        secret = 'SYNTHETIC_SECRET_MUST_NOT_APPEAR'
+        result = self.run_cli('API_KEY="' + secret + '\n', 'API_KEY=\n')
+        self.assertEqual(result.returncode, 2)
+        self.assertNotIn(secret, result.stdout + result.stderr)
+        self.assertNotIn('Traceback', result.stderr)
+
+    def test_invalid_encoding_is_safe(self):
+        result = self.run_cli(b'KEY=\xff', 'KEY=\n')
+        self.assertEqual(result.returncode, 2)
+        self.assertIn('invalid_encoding', result.stdout)
+        self.assertNotIn('Traceback', result.stderr)
+
+    def test_bom_file_and_empty_value(self):
+        result = self.run_cli('\ufeffKEY=" "\r\n', 'KEY=\r\n')
+        self.assertEqual(result.returncode, 1)
+        self.assertIn('Empty: KEY', result.stdout)

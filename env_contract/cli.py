@@ -8,7 +8,7 @@ from .core import Comparison, Document, compare_documents, parse_document
 
 def read_document(path: Path, role: str) -> tuple[Document, list[dict[str, str]]]:
     try:
-        return parse_document(path.read_text(encoding='utf-8')), []
+        return parse_document(path.read_text(encoding='utf-8-sig')), []
     except UnicodeError:
         return Document(), [{'file': role, 'kind': 'invalid_encoding'}]
     except OSError:
